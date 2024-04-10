@@ -6,7 +6,7 @@ import toml
 
 from asyncio import subprocess
 from asyncio.streams import StreamReader
-from typing import Any
+from typing import Any, Sequence
 
 
 class TextMode:
@@ -69,7 +69,7 @@ class Job:
         self,
         depman: "DependencyManager",
         job_id: str,
-        steps: list[Step | str] | None = None,
+        steps: Sequence[Step | str] | None = None,
         env: dict[str, str] | None = None,
         depends_on: "list[str] | None" = None,
         workdir: str | None = None,
@@ -162,6 +162,22 @@ def print_error(msg: str) -> None:
     print(TextMode.BOLD, TextMode.RED, "===> ", msg, TextMode.RESET)
 
 
+class JobDef:
+
+    def __init__(
+        self, steps: list[str], depends_on: list["JobDef"], workdir: str | None = None
+    ) -> None:
+        self.steps = steps
+        self.depends_on = depends_on
+        self.workdir = workdir
+
+
+def job(
+    *steps: str, depends_on: list[JobDef] | None = None, workdir: str | None = None
+) -> JobDef:
+    return JobDef(list(steps), depends_on or [], workdir)
+
+
 class Gør:
 
     def __init__(self, depman: DependencyManager) -> None:
@@ -171,7 +187,7 @@ class Gør:
         await asyncio.gather(*[job.run() for job in self.depman.find_jobs(job_ids)])
 
     @staticmethod
-    def load_dofile(path: str) -> "Gør":
+    def load_toml(path: str) -> "Gør":
         data = toml.load(path)
 
         depman = DependencyManager()
@@ -183,7 +199,46 @@ class Gør:
 
         return Gør(depman)
 
+    @staticmethod
+    def load_python(path: str) -> "Gør":
+        scope: dict[str, Any] = {}
 
-if __name__ == "__main__":
-    gør = Gør.load_dofile("Dofile.toml")
-    asyncio.run(gør.run(sys.argv[1:]))
+        with open(path) as f:
+            exec(f.read(), {}, scope)
+
+        depman = DependencyManager()
+
+        job_defs = {
+            job_id: job_def
+            for job_id, job_def in scope.items()
+            if isinstance(job_def, JobDef)
+        }
+
+        jobs: list[Job] = []
+        for job_id, job_def in job_defs.items():
+            job = Job(
+                depman,
+                job_id,
+                job_def.steps,
+                depends_on=_find_job_dep_ids(job_defs, job_def.depends_on),
+            )
+            jobs.append(job)
+
+        depman.initialize(jobs)
+
+        return Gør(depman)
+
+
+def _find_job_dep_ids(job_defs: dict[str, JobDef], deps: list[JobDef]) -> list[str]:
+    job_dep_ids: list[str] = []
+
+    for dep in deps:
+        found = False
+        for job_id, job_def in job_defs.items():
+            if dep is job_def:
+                job_dep_ids.append(job_id)
+                found = True
+        if not found:
+            raise RuntimeError("Could not match dependency")
+
+    return job_dep_ids

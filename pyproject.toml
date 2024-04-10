@@ -7,3 +7,9 @@ dependencies = ["toml"]
 
 [project.optional-dependencies]
 dev = ["ruff", "mypy==1.8.0", "types-toml"]
+
+[tool.setuptools.package-data]
+"goer" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
