@@ -2,11 +2,13 @@
 name = "goer"
 readme = "README.md"
 version = "0.0.1"
-
 dependencies = ["toml"]
 
 [project.optional-dependencies]
 dev = ["ruff", "mypy==1.8.0", "types-toml"]
+
+[project.scripts]
+goer = "goer.main:main"
 
 [tool.setuptools.package-data]
 "goer" = ["py.typed"]

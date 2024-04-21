@@ -1,12 +1,14 @@
 import asyncio
 import os
 import random
-import sys
+import time
 import toml
 
 from asyncio import subprocess
 from asyncio.streams import StreamReader
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
+
+from goer.rules import Rule
 
 
 class TextMode:
@@ -40,7 +42,7 @@ class Step:
 
     async def run(
         self, env: dict[str, str], workdir: str | None = None
-    ) -> tuple[StreamReader, StreamReader]:
+    ) -> tuple[subprocess.Process, StreamReader, StreamReader]:
         proc = await subprocess.create_subprocess_exec(
             "bash",
             "-c",
@@ -61,7 +63,7 @@ class Step:
             stderr = StreamReader()
             stderr.feed_eof()
 
-        return (stdout, stderr)
+        return (proc, stdout, stderr)
 
 
 class Job:
@@ -73,35 +75,66 @@ class Job:
         env: dict[str, str] | None = None,
         depends_on: "list[str] | None" = None,
         workdir: str | None = None,
+        rules: list[Rule] | None = None,
     ) -> None:
         self.depman = depman
         self.job_id = job_id
-        self.steps = steps
+        self.steps = steps or []
         self.env = env or dict(os.environ)
         self.depends_on = depends_on or []
         self.workdir = workdir or os.curdir
+        self.rules = rules
         self.color = random.choice(COLORS)
 
-    async def run(self) -> None:
+    @property
+    def pretty_job_id(self) -> str:
+        return f"{self.color}{self.job_id}{TextMode.RESET}"
+
+    async def run(self) -> bool:
+        try:
+            return await self._run()
+        except Exception as e:
+            print_error(f"error occurred: {e}")
+            return False
+
+    async def _run(self) -> bool:
         if self.depends_on:
-            print_header(f"running dependencies for '{self.job_id}'")
-            await asyncio.gather(
+            print_header("running dependencies for '", self.pretty_job_id, "'")
+            results = await asyncio.gather(
                 *[self.depman.await_job(job_id) for job_id in self.depends_on]
             )
+            if not all(results):
+                print_error("dependency failed for '", self.pretty_job_id, "'")
+                return False
+
+        if self.rules and all(rule.can_skip() for rule in self.rules):
+            print_header("skipping '", self.pretty_job_id, "' since all rules passed")
+            return True
 
         if self.steps:
-            await self.run_steps()
+            if exit_code := await self.run_steps():
+                print_error(
+                    "job '", self.pretty_job_id, f"' failed with exit code {exit_code}"
+                )
+                return False
 
-    async def run_steps(self):
-        print_header(f"running job '{self.job_id}' steps in '{self.workdir}'")
+        print_header("job '", self.pretty_job_id, "' done")
+        return True
+
+    async def run_steps(self) -> Optional[int]:
+        print_header("job '", self.pretty_job_id, f"' running in '{self.workdir}'")
         for step in self.steps:
             step = Step(step) if isinstance(step, str) else step
-            stdout, stderr = await step.run(self.env, self.workdir)
+            proc, stdout, stderr = await step.run(self.env, self.workdir)
             print(self._prefix(step.cmd))
             pstdout = self._print_stream(stdout)
             pstderr = self._print_stream(stderr)
             await asyncio.gather(pstdout, pstderr)
-        print_header(f"job steps '{self.job_id}' done")
+            exit_code = await proc.wait()
+            if exit_code != 0:
+                return exit_code
+
+        return None
 
     async def _print_stream(self, stream: StreamReader) -> None:
         while not stream.at_eof():
@@ -134,17 +167,25 @@ class DependencyManager:
         self.jobs: dict[str, Job] = {}
         self.jobs_done: dict[str, bool] = {}
 
-    async def await_job(self, job_id: str) -> None:
+    async def await_job(self, job_id: str) -> bool:
+        try:
+            return await self._await_job(job_id)
+        except Exception as e:
+            print_error(f"job '{job_id}' failed with error: {e}")
+            return False
+
+    async def _await_job(self, job_id: str) -> bool:
         if self.jobs_done.get(job_id, False):
-            return
+            return True
 
         job = self.jobs.get(job_id)
         if job is None:
             print_error(f"job '{job_id}' not found!")
-            return
+            return False
 
-        await job.run()
+        job_exit_code = await job._run()
         self.jobs_done[job_id] = True
+        return job_exit_code
 
     def initialize(self, jobs: list[Job]) -> None:
         for job in jobs:
@@ -154,28 +195,45 @@ class DependencyManager:
         return [job for job in self.jobs.values() if job.job_id in job_ids]
 
 
-def print_header(msg: str) -> None:
-    print(TextMode.BOLD, "===> ", msg, TextMode.RESET, sep="")
+def print_header(*args: str) -> None:
+    msgs = []
+    for arg in args:
+        msgs.append(arg)
+        msgs.append(TextMode.RESET)
+        msgs.append(TextMode.BOLD)
+    print(TextMode.BOLD, "--- ", *msgs, TextMode.RESET, sep="")
 
 
-def print_error(msg: str) -> None:
-    print(TextMode.BOLD, TextMode.RED, "===> ", msg, TextMode.RESET)
+def print_error(*args: str) -> None:
+    msgs = []
+    for arg in args:
+        msgs.append(arg)
+        msgs.append(TextMode.RED)
+    print(TextMode.BOLD, TextMode.RED, "--- ", *msgs, TextMode.RESET, sep="")
 
 
 class JobDef:
 
     def __init__(
-        self, steps: list[str], depends_on: list["JobDef"], workdir: str | None = None
+        self,
+        steps: list[str],
+        depends_on: list["JobDef"],
+        rules: list[Rule] | None = None,
+        workdir: str | None = None,
     ) -> None:
         self.steps = steps
         self.depends_on = depends_on
+        self.rules = rules
         self.workdir = workdir
 
 
 def job(
-    *steps: str, depends_on: list[JobDef] | None = None, workdir: str | None = None
+    *steps: str,
+    depends_on: list[JobDef] | None = None,
+    rules: list[Rule] | None = None,
+    workdir: str | None = None,
 ) -> JobDef:
-    return JobDef(list(steps), depends_on or [], workdir)
+    return JobDef(list(steps), depends_on or [], rules, workdir)
 
 
 class Gør:
@@ -183,8 +241,21 @@ class Gør:
     def __init__(self, depman: DependencyManager) -> None:
         self.depman = depman
 
-    async def run(self, job_ids: list[str]) -> None:
-        await asyncio.gather(*[job.run() for job in self.depman.find_jobs(job_ids)])
+    def list_job_ids(self) -> list[str]:
+        return [job_id for job_id in self.depman.jobs.keys()]
+
+    async def run(self, job_ids: list[str]) -> bool:
+        t = time.time()
+
+        jobs = self.depman.find_jobs(job_ids)
+        results = await asyncio.gather(*[job._run() for job in jobs])
+        failed_jobs = not all(results)
+        if failed_jobs:
+            print_error("jobs failed")
+
+        elapsed = time.time() - t
+        print_header(f"elapsed: {elapsed:.2f}s")
+        return failed_jobs
 
     @staticmethod
     def load_toml(path: str) -> "Gør":
@@ -221,6 +292,8 @@ class Gør:
                 job_id,
                 job_def.steps,
                 depends_on=_find_job_dep_ids(job_defs, job_def.depends_on),
+                rules=job_def.rules,
+                workdir=job_def.workdir,
             )
             jobs.append(job)
 

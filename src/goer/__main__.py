@@ -1,8 +1,4 @@
-import asyncio
-import sys
-from goer.goer import Gør
-
+from .main import main
 
 if __name__ == "__main__":
-    gør = Gør.load_python("Goerfile.py")
-    asyncio.run(gør.run(sys.argv[1:]))
+    main()
