@@ -1,8 +1,8 @@
 import asyncio
 import time
-import toml
-
 from typing import Any
+
+import toml
 
 from goer.depman import DependencyManager
 from goer.job import Job, JobDef

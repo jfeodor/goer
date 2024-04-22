@@ -1,12 +1,7 @@
-from asyncio import StreamReader, subprocess
 import asyncio
-from dataclasses import dataclass, field
-import os
-import random
-from typing import Any, Sequence
+
 from goer.job import Job
-from goer.rules import Rule
-from goer.text import COLORS, TextMode, print_error, print_header
+from goer.text import print_error, print_header
 
 
 class DependencyManager:

@@ -15,3 +15,6 @@ goer = "goer.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff.lint]
+select = ["I001", "I002", "F401"]

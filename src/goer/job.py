@@ -1,9 +1,10 @@
-from asyncio import StreamReader, subprocess
 import asyncio
-from dataclasses import dataclass, field
 import os
 import random
+from asyncio import StreamReader, subprocess
+from dataclasses import dataclass, field
 from typing import Any, Sequence
+
 from goer.rules import Rule
 from goer.text import COLORS, TextMode, print_error, print_header
 
