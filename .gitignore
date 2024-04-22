@@ -1,3 +1,7 @@
+# editor configs
+.vscode
+
+# python
 venv
 *.egg-info
 __pycache__
