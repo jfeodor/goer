@@ -4,7 +4,8 @@ import toml
 
 from typing import Any
 
-from goer.job import Job, JobDef, DependencyManager
+from goer.depman import DependencyManager
+from goer.job import Job, JobDef
 from goer.text import print_error, print_header
 
 
