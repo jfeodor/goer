@@ -20,7 +20,7 @@ class Gør:
         t = time.time()
 
         jobs = self.depman.find_jobs(job_ids)
-        results = await asyncio.gather(*[job._run() for job in jobs])
+        results = await asyncio.gather(*[self.depman.run_job(job) for job in jobs])
         failed_jobs = not all(results)
         if failed_jobs:
             print_error("jobs failed")
@@ -35,8 +35,7 @@ class Gør:
 
         depman = DependencyManager()
         jobs = [
-            Job.from_toml(depman, job_id, job_data)
-            for job_id, job_data in data["jobs"].items()
+            Job.from_toml(job_id, job_data) for job_id, job_data in data["jobs"].items()
         ]
         depman.initialize(jobs)
 
@@ -60,11 +59,10 @@ class Gør:
         jobs: list[Job] = []
         for job_id, job_def in job_defs.items():
             job = Job(
-                depman,
                 job_id,
                 job_def.steps,
                 depends_on=_find_job_dep_ids(job_defs, job_def.depends_on),
-                rules=job_def.rules,
+                rules=job_def.rules or [],
                 workdir=job_def.workdir,
             )
             jobs.append(job)
