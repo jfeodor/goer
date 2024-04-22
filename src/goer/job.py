@@ -109,7 +109,6 @@ class Job:
 
 
 class JobDef:
-
     def __init__(
         self,
         steps: list[str],

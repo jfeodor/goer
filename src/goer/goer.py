@@ -10,7 +10,6 @@ from goer.text import print_error, print_header
 
 
 class Gør:
-
     def __init__(self, depman: DependencyManager) -> None:
         self.depman = depman
 

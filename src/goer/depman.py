@@ -5,7 +5,6 @@ from goer.text import print_error, print_header
 
 
 class DependencyManager:
-
     def __init__(self) -> None:
         self.jobs: dict[str, Job] = {}
         self.jobs_done: dict[str, bool] = {}
