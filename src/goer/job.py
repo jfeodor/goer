@@ -3,6 +3,7 @@ import os
 import random
 from asyncio import StreamReader, subprocess
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Sequence
 
 from goer.dep import Dependency
@@ -68,10 +69,13 @@ class Job(Dependency):
         return True
 
     async def run_steps(self) -> int | None:
-        print_header("job '", self.pretty_id, f"' running in '{self.workdir}'")
+        workdir = self.workdir or os.curdir
+        print_header(
+            "job '", self.pretty_id, f"' running in '{Path(workdir).absolute()}'"
+        )
         for step in self.steps:
             step = Step(step) if isinstance(step, str) else step
-            proc, stdout, stderr = await step.run(self.env, self.workdir)
+            proc, stdout, stderr = await step.run(self.env, workdir)
             print(self._prefix(step.cmd))
             pstdout = self._print_stream(stdout)
             pstderr = self._print_stream(stderr)
