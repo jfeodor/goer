@@ -11,9 +11,9 @@ my_job = goer.job(
     "echo my job",
     "sleep 0.5",
     "echo my job done",
-    "cat *-glob.txt > dst-glob.txt",
+    "cat source-glob-*.txt > dst-glob.txt",
     depends_on=[my_other_job],
-    rules=[SourceGlobRule("*-glob.txt", "dst-glob.txt")],
+    rules=[SourceGlobRule("source-glob-*.txt", "dst-glob.txt")],
 )
 
 my_third_job = goer.job(

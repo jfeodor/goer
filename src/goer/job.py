@@ -5,6 +5,7 @@ from asyncio import StreamReader, subprocess
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
+from goer.dep import Dependency
 from goer.rules import Rule
 from goer.text import COLORS, TextMode, print_error, print_header
 
@@ -40,18 +41,13 @@ class Step:
 
 
 @dataclass
-class Job:
-    job_id: str
+class Job(Dependency):
     steps: Sequence[Step | str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=lambda: dict(os.environ))
-    depends_on: list[str] = field(default_factory=list)
+    depends_on: list[Dependency] = field(default_factory=list)
     workdir: str | None = None
     rules: list[Rule] = field(default_factory=list)
     color: str = field(default_factory=lambda: random.choice(COLORS))
-
-    @property
-    def pretty_job_id(self) -> str:
-        return f"{self.color}{self.job_id}{TextMode.RESET}"
 
     async def run(self) -> bool:
         try:
@@ -64,15 +60,15 @@ class Job:
         if self.steps:
             if exit_code := await self.run_steps():
                 print_error(
-                    "job '", self.pretty_job_id, f"' failed with exit code {exit_code}"
+                    "job '", self.pretty_id, f"' failed with exit code {exit_code}"
                 )
                 return False
 
-        print_header("job '", self.pretty_job_id, "' done")
+        print_header("job '", self.pretty_id, "' done")
         return True
 
     async def run_steps(self) -> int | None:
-        print_header("job '", self.pretty_job_id, f"' running in '{self.workdir}'")
+        print_header("job '", self.pretty_id, f"' running in '{self.workdir}'")
         for step in self.steps:
             step = Step(step) if isinstance(step, str) else step
             proc, stdout, stderr = await step.run(self.env, self.workdir)
@@ -95,7 +91,7 @@ class Job:
             print(self._prefix(ln))
 
     def _prefix(self, s: str) -> str:
-        return f"{self.color}{self.job_id}|{TextMode.RESET}{s}"
+        return f"{self.color}{self.dep_id}|{TextMode.RESET}{s}"
 
     @staticmethod
     def from_toml(job_id: str, data: dict[str, Any]) -> "Job":
