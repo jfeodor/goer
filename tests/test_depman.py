@@ -25,7 +25,7 @@ class FakeDependency(Dependency):
     def last_modified(self) -> datetime:
         return self._last_modified
 
-    async def run(self) -> bool:
+    async def _run(self) -> bool:
         self.call_count += 1
         return self._result
 

@@ -2,8 +2,8 @@ import asyncio
 import time
 from typing import Any
 
+from goer.dep import DependencyDef
 from goer.depman import DependencyManager
-from goer.job import JobDef
 from goer.text import print_error, print_header
 
 
@@ -37,6 +37,6 @@ class Gør:
         job_defs = {
             job_id: job_def
             for job_id, job_def in scope.items()
-            if isinstance(job_def, JobDef)
+            if isinstance(job_def, DependencyDef)
         }
-        return Gør(DependencyManager.from_job_defs(job_defs))
+        return Gør(DependencyManager.from_defs(job_defs))
