@@ -5,8 +5,9 @@ from goer.goer import Gør
 
 
 def usage() -> None:
-    print("goer [-h|--help] [JOB]...")
-    print("Execute jobs defined in python files.")
+    """Prints the usage of the `goer` CLI."""
+    print("goer [-h|--help] [DEPENDENCY]...")
+    print("Execute dependencies defined in python files.")
     print()
     print("Options:")
     print("  -h, --help   print this message")
@@ -15,6 +16,7 @@ def usage() -> None:
 
 
 def main() -> None:
+    """Run the `goer` command."""
     args = sys.argv[1:]
     if "-h" in args or "--help" in args:
         usage()
@@ -29,7 +31,7 @@ def main() -> None:
 
     job_ids = args
     if not job_ids:
-        print("available jobs:", *gør.list_job_ids())
+        print("available dependencies:", *gør.list_dep_ids())
         sys.exit(0)
 
     if asyncio.run(gør.run(job_ids)):

@@ -1,4 +1,9 @@
+"""Text output helpers."""
+
+
 class TextMode:
+    """Terminal escape codes for colorizing terminal output."""
+
     RESET = "\033[0m"
     BOLD = "\033[1m"
     GREY = "\033[90m"
@@ -21,9 +26,11 @@ COLORS = [
     TextMode.CYAN,
     TextMode.WHITE,
 ]
+"""All `TextMode` values, which are colors."""
 
 
 def print_header(*args: str) -> None:
+    """Prints a pretty header message."""
     msgs = []
     for arg in args:
         msgs.append(arg)
@@ -33,6 +40,7 @@ def print_header(*args: str) -> None:
 
 
 def print_error(*args: str) -> None:
+    """Prints a pretty error message."""
     msgs = []
     for arg in args:
         msgs.append(arg)

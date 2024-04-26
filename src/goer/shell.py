@@ -1,3 +1,8 @@
+"""Shell dependencies.
+
+Contains functionality for defining dependencies on shell scripts.
+"""
+
 import asyncio
 import os
 import random
@@ -11,12 +16,18 @@ from goer.text import COLORS, TextMode
 
 
 class Step:
+    """A step is a single bash command."""
+
     def __init__(self, cmd: str) -> None:
         self.cmd = cmd
 
     async def run(
         self, env: dict[str, str], workdir: str | None = None
     ) -> tuple[subprocess.Process, StreamReader, StreamReader]:
+        """Runs the step command in a bash process, with the given environment,
+        and in the given working directory -- or the current directory, if none
+        is given.
+        """
         proc = await subprocess.create_subprocess_exec(
             "bash",
             "-c",
@@ -42,6 +53,15 @@ class Step:
 
 @dataclass
 class ShellScript(Dependency):
+    """A shell script dependency.
+
+    Runs a sequence of steps, which are commands that will run in a bash shell.
+
+    Working directory, and environment variables are configurable, along with
+    a set of target files, which will define the `last_modified` value of the
+    dependency.
+    """
+
     color: str = field(default_factory=lambda: random.choice(COLORS))
     depends_on: list["Dependency"] = field(default_factory=list)
     steps: Sequence[Step | str] = field(default_factory=list)
@@ -50,7 +70,7 @@ class ShellScript(Dependency):
     targets: list[str] | None = None
 
     async def _run(self) -> bool:
-        exit_code = await self.run_steps()
+        exit_code = await self._run_steps()
         if exit_code is None:
             return True
 
@@ -59,7 +79,7 @@ class ShellScript(Dependency):
 
         return True
 
-    async def run_steps(self) -> int | None:
+    async def _run_steps(self) -> int | None:
         workdir = self.workdir or os.curdir
         for step in self.steps:
             step = Step(step) if isinstance(step, str) else step
@@ -101,6 +121,11 @@ def _target_last_modified(target: str) -> datetime:
 
 @dataclass
 class ShellScriptDef(DependencyDef):
+    """Definition of a shell script dependency.
+
+    Initializes to a `ShellScript` dependency.
+    """
+
     steps: list[str]
     dependencies: list[DependencyDef]
     workdir: str | None = None
@@ -113,6 +138,7 @@ class ShellScriptDef(DependencyDef):
     def initialize(
         self, dep_id: str, color: str, depends_on: list[Dependency]
     ) -> ShellScript:
+        """Returns the corresponding initialized `ShellScript` dependency."""
         return ShellScript(
             dep_id,
             color=color,
@@ -129,4 +155,14 @@ def shell(
     workdir: str | None = None,
     targets: list[str] | None = None,
 ) -> ShellScriptDef:
+    """Returns a shell script dependency.
+
+    Example of building a `go` binary.
+    >>> build_bin = shell(
+    >>>    "go mod download",
+    >>>    "go build -o build/bin .",
+    >>>    workdir="go_project",
+    >>>    targets=["build/bin"],
+    >>> )
+    """
     return ShellScriptDef(list(steps), depends_on or [], workdir, targets)

@@ -1,3 +1,13 @@
+"""Dependency manager.
+
+The dependency manager can be initialized with a mapping of dependency IDs to
+dependency definitions, setting up the correct relations between the initialized
+dependencies.
+
+When initialized, the dependency manager can run specific dependencies,
+including running all sub-dependencies.
+"""
+
 import asyncio
 import random
 from typing import Iterable
@@ -7,11 +17,15 @@ from goer.text import COLORS, print_error, print_header
 
 
 class DependencyManager:
+    """Runs a dependency tree recursively."""
+
     def __init__(self, deps: Iterable[Dependency]) -> None:
         self.deps: dict[str, Dependency] = {dep.dep_id: dep for dep in deps}
         self.deps_running: dict[str, asyncio.Future[bool]] = {}
 
     async def run_dep(self, dep: Dependency) -> bool:
+        """Runs the dependency tree."""
+
         last_modified = dep.last_modified
         if dep.depends_on and all(
             last_modified > dep_dep.last_modified for dep_dep in dep.depends_on
@@ -58,6 +72,11 @@ class DependencyManager:
 
     @staticmethod
     def from_defs(defs: dict[str, DependencyDef]) -> "DependencyManager":
+        """Initialize a dependency manager from dependency definitions.
+
+        Sets up correct relations between definitions. Dependency cycles will
+        result in an error being raised.
+        """
         uninitialized_dep_defs = dict(defs)
         initialized_deps: dict[str, Dependency] = {}
 
